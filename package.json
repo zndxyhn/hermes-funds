@@ -1,0 +1,45 @@
+{
+  "name": "hermes-funds",
+  "version": "1.0.0",
+  "description": "Personal & Family Finance Manager — Expense Tracking + Investment Portfolio",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "drizzle-orm": "^0.45.2",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.5.0",
+    "drizzle-kit": "^0.30.6",
+    "postcss": "^8.5.13",
+    "typescript": "^6.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zndxyhn/hermes-funds.git"
+  },
+  "keywords": [
+    "finance",
+    "expense-tracker",
+    "investment-portfolio",
+    "personal-finance"
+  ],
+  "author": "zndxyhn",
+  "license": "MIT"
+}
