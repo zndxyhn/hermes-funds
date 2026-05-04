@@ -13,13 +13,13 @@ const FUND_DETAIL_API = "https://fundf10.crealworld.com/F10/FundBase";
 
 interface EastMoneyFundGZ {
   /** 基金代码 */
-  fundId: string;
+  fundcode: string;
   /** 基金名称 */
   name: string;
   /** 单位净值 */
   dwjz: string;
   /** 净值日期 */
-  djrq: string;
+  jzrq: string;
   /** 估算净值（交易日更新） */
   gsz: string;
   /** 估算时间 */
@@ -67,13 +67,13 @@ export async function fetchFundQuote(ticker: string): Promise<{
 
     const data: EastMoneyFundGZ = JSON.parse(jsonMatch[1]);
 
-    if (!data.fundId) return null;
+    if (!data.fundcode) return null;
 
     return {
-      ticker: data.fundId,
+      ticker: data.fundcode,
       name: data.name,
       nav: parseFloat(data.dwjz) || 0,
-      navDate: data.djrq,
+      navDate: data.jzrq,
       estNav: parseFloat(data.gsz) || 0,
       estNavTime: data.gztime,
       dayChange: parseFloat(data.gszzl) || 0,
