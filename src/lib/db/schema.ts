@@ -118,7 +118,7 @@ export const investmentTransactions = sqliteTable("investment_transactions", {
   navPrice: real("nav_price").notNull(), // 成交净值/价格
   date: integer("date").notNull(),
   notes: text("notes"),
-  source: text("source", { enum: ["dialog", "form", "sip"] }).default("form"),
+  source: text("source", { enum: ["dialog", "form", "sip", "recurring_bill"] }).default("form"),
   createdAt: integer("created_at"),
 });
 
@@ -165,6 +165,27 @@ export const budgets = sqliteTable("budgets", {
   amount: real("amount").notNull(),
   period: text("period", { enum: ["weekly", "monthly", "yearly"] }).default("monthly"),
   startDate: integer("start_date"),
+  createdAt: integer("created_at"),
+  updatedAt: integer("updated_at"),
+});
+
+// ─────────────────────────────────────────────
+// 周期账单表
+// ─────────────────────────────────────────────
+export const recurringBills = sqliteTable("recurring_bills", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  accountId: text("account_id").notNull().references(() => accounts.id),
+  categoryId: text("category_id").references(() => categories.id),
+  name: text("name").notNull(),
+  amount: real("amount").notNull(),
+  frequency: text("frequency", {
+    enum: ["daily", "weekly", "biweekly", "monthly", "quarterly", "yearly"],
+  }).notNull(),
+  nextDueDate: integer("next_due_date").notNull(),
+  lastRunDate: integer("last_run_date"),
+  notes: text("notes"),
+  enabled: integer("enabled", { mode: "boolean" }).default(true),
   createdAt: integer("created_at"),
   updatedAt: integer("updated_at"),
 });
@@ -277,6 +298,21 @@ export const assetSnapshotsRelations = relations(assetSnapshots, ({ one }) => ({
   }),
 }));
 
+export const recurringBillsRelations = relations(recurringBills, ({ one }) => ({
+  user: one(users, {
+    fields: [recurringBills.userId],
+    references: [users.id],
+  }),
+  account: one(accounts, {
+    fields: [recurringBills.accountId],
+    references: [accounts.id],
+  }),
+  category: one(categories, {
+    fields: [recurringBills.categoryId],
+    references: [categories.id],
+  }),
+}));
+
 // ─────────────────────────────────────────────
 // 类型导出
 // ─────────────────────────────────────────────
@@ -300,5 +336,7 @@ export type SipPlan = typeof sipPlans.$inferSelect;
 export type NewSipPlan = typeof sipPlans.$inferInsert;
 export type Budget = typeof budgets.$inferSelect;
 export type NewBudget = typeof budgets.$inferInsert;
+export type RecurringBill = typeof recurringBills.$inferSelect;
+export type NewRecurringBill = typeof recurringBills.$inferInsert;
 export type AssetSnapshot = typeof assetSnapshots.$inferSelect;
 export type NewAssetSnapshot = typeof assetSnapshots.$inferInsert;

@@ -174,6 +174,22 @@ export function initDatabase() {
       updated_at INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS recurring_bills (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      category_id TEXT REFERENCES categories(id),
+      name TEXT NOT NULL,
+      amount REAL NOT NULL,
+      frequency TEXT NOT NULL CHECK(frequency IN ('daily','weekly','biweekly','monthly','quarterly','yearly')),
+      next_due_date INTEGER NOT NULL,
+      last_run_date INTEGER,
+      notes TEXT,
+      enabled INTEGER DEFAULT 1,
+      created_at INTEGER,
+      updated_at INTEGER
+    );
+
     CREATE TABLE IF NOT EXISTS asset_snapshots (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id),
