@@ -1,14 +1,15 @@
 /**
  * 种子数据脚本：为新用户初始化默认账户和分类
  * 运行方式: npx tsx src/lib/db/scripts/seed.ts
+ *
+ * 幂等设计：可重复运行，每次只插入不存在的记录
  */
 import { getDb, initDatabase } from "../index";
 import { users, accounts, categories } from "../schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 const DEFAULT_USER_ID = "user_default";
 
-// 先初始化数据库表
 initDatabase();
 
 function generateId(prefix: string) {
@@ -17,60 +18,77 @@ function generateId(prefix: string) {
 
 export async function seedDefaultData(userId: string = DEFAULT_USER_ID) {
   const db = getDb();
+  const now = Math.floor(Date.now() / 1000);
 
-  // 检查是否已有数据
+  // 1. 确保默认用户存在
   const existingUser = await db
     .select()
     .from(users)
     .where(eq(users.id, userId))
     .get();
 
-  if (existingUser) {
-    console.log("✅ 种子数据已存在，跳过");
-    return;
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-
-  // 1. 创建默认用户
-  await db.insert(users).values({
-    id: userId,
-    name: "我的账户",
-    email: null,
-    avatar: null,
-    createdAt: now,
-    updatedAt: now,
-  });
-  console.log("✅ 默认用户创建成功");
-
-  // 2. 创建默认账户
-  const defaultAccounts = [
-    { id: generateId("acc"), name: "现金", type: "cash" as const, isDefault: true, icon: "💵", sortOrder: 1 },
-    { id: generateId("acc"), name: "我的银行卡", type: "bank" as const, isDefault: false, icon: "🏦", sortOrder: 2 },
-    { id: generateId("acc"), name: "支付宝", type: "digital" as const, isDefault: false, icon: "💙", sortOrder: 3 },
-    { id: generateId("acc"), name: "微信", type: "digital" as const, isDefault: false, icon: "💚", sortOrder: 4 },
-    { id: generateId("acc"), name: "投资账户", type: "investment" as const, isDefault: false, icon: "📈", sortOrder: 5 },
-  ];
-
-  for (const acc of defaultAccounts) {
-    await db.insert(accounts).values({
-      id: acc.id,
-      userId,
-      name: acc.name,
-      type: acc.type,
-      balance: 0,
-      currency: "CNY",
-      icon: acc.icon,
-      color: null,
-      sortOrder: acc.sortOrder,
-      isDefault: acc.isDefault,
+  if (!existingUser) {
+    await db.insert(users).values({
+      id: userId,
+      name: "默认用户",
+      email: null,
+      avatar: null,
       createdAt: now,
       updatedAt: now,
     });
+    console.log("✅ 默认用户创建成功");
+  } else {
+    console.log("✅ 默认用户已存在");
   }
-  console.log(`✅ ${defaultAccounts.length} 个默认账户创建成功`);
 
-  // 3. 创建默认支出分类
+  // 2. 确保默认账户存在（按名称检查，避免重复）
+  const existingAccounts = await db
+    .select({ name: accounts.name })
+    .from(accounts)
+    .where(eq(accounts.userId, userId))
+    .all();
+
+  const existingAccountNames = new Set(existingAccounts.map((a) => a.name));
+
+  const defaultAccounts = [
+    { name: "现金", type: "cash" as const, isDefault: true, icon: "💵", sortOrder: 1 },
+    { name: "我的银行卡", type: "bank" as const, isDefault: false, icon: "🏦", sortOrder: 2 },
+    { name: "支付宝", type: "digital" as const, isDefault: false, icon: "💙", sortOrder: 3 },
+    { name: "微信", type: "digital" as const, isDefault: false, icon: "💚", sortOrder: 4 },
+    { name: "投资账户", type: "investment" as const, isDefault: false, icon: "📈", sortOrder: 5 },
+  ];
+
+  let accCreated = 0;
+  for (const acc of defaultAccounts) {
+    if (!existingAccountNames.has(acc.name)) {
+      await db.insert(accounts).values({
+        id: generateId("acc"),
+        userId,
+        name: acc.name,
+        type: acc.type,
+        balance: 0,
+        currency: "CNY",
+        icon: acc.icon,
+        color: null,
+        sortOrder: acc.sortOrder,
+        isDefault: acc.isDefault,
+        createdAt: now,
+        updatedAt: now,
+      });
+      accCreated++;
+    }
+  }
+  console.log(`✅ 账户: ${defaultAccounts.length - accCreated}/${defaultAccounts.length} 已存在，${accCreated} 新建`);
+
+  // 3. 确保支出分类存在（按名称检查）
+  const existingCats = await db
+    .select({ name: categories.name, type: categories.type })
+    .from(categories)
+    .where(eq(categories.userId, userId))
+    .all();
+
+  const existingCatKeys = new Set(existingCats.map((c) => `${c.type}:${c.name}`));
+
   const expenseCategories = [
     { name: "餐饮", icon: "🍜", sortOrder: 1 },
     { name: "购物", icon: "🛒", sortOrder: 2 },
@@ -87,24 +105,6 @@ export async function seedDefaultData(userId: string = DEFAULT_USER_ID) {
     { name: "其他支出", icon: "📦", sortOrder: 99 },
   ];
 
-  for (const cat of expenseCategories) {
-    await db.insert(categories).values({
-      id: generateId("cat_exp"),
-      userId,
-      type: "expense",
-      name: cat.name,
-      icon: cat.icon,
-      color: null,
-      parentId: null,
-      sortOrder: cat.sortOrder,
-      isSystem: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-  console.log(`✅ ${expenseCategories.length} 个支出分类创建成功`);
-
-  // 4. 创建默认收入分类
   const incomeCategories = [
     { name: "工资", icon: "💰", sortOrder: 1 },
     { name: "奖金", icon: "🎁", sortOrder: 2 },
@@ -114,24 +114,51 @@ export async function seedDefaultData(userId: string = DEFAULT_USER_ID) {
     { name: "其他收入", icon: "💵", sortOrder: 99 },
   ];
 
-  for (const cat of incomeCategories) {
-    await db.insert(categories).values({
-      id: generateId("cat_inc"),
-      userId,
-      type: "income",
-      name: cat.name,
-      icon: cat.icon,
-      color: null,
-      parentId: null,
-      sortOrder: cat.sortOrder,
-      isSystem: true,
-      createdAt: now,
-      updatedAt: now,
-    });
+  let expCreated = 0;
+  for (const cat of expenseCategories) {
+    if (!existingCatKeys.has(`expense:${cat.name}`)) {
+      await db.insert(categories).values({
+        id: generateId("cat_exp"),
+        userId,
+        type: "expense",
+        name: cat.name,
+        icon: cat.icon,
+        color: null,
+        parentId: null,
+        sortOrder: cat.sortOrder,
+        isSystem: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      expCreated++;
+    }
   }
-  console.log(`✅ ${incomeCategories.length} 个收入分类创建成功`);
+  console.log(`✅ 支出分类: ${expenseCategories.length - expCreated}/${expenseCategories.length} 已存在，${expCreated} 新建`);
 
-  console.log("\n🎉 种子数据初始化完成！");
+  let incCreated = 0;
+  for (const cat of incomeCategories) {
+    if (!existingCatKeys.has(`income:${cat.name}`)) {
+      await db.insert(categories).values({
+        id: generateId("cat_inc"),
+        userId,
+        type: "income",
+        name: cat.name,
+        icon: cat.icon,
+        color: null,
+        parentId: null,
+        sortOrder: cat.sortOrder,
+        isSystem: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      incCreated++;
+    }
+  }
+  console.log(`✅ 收入分类: ${incomeCategories.length - incCreated}/${incomeCategories.length} 已存在，${incCreated} 新建`);
+
+  // 4. 验证最终数据
+  const catCount = await db.select().from(categories).where(eq(categories.userId, userId)).all();
+  console.log(`\n🎉 种子数据就绪：用户 1 个，账户 ${defaultAccounts.length} 个，分类 ${catCount.length} 个`);
 }
 
 // 自动执行
