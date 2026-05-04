@@ -1,0 +1,794 @@
+openapi: 3.0.3
+info:
+  title: Hermes Funds API
+  description: |
+    Personal & Family Finance Management API.
+
+    Supports:
+    - Expense/Income tracking with natural language parsing
+    - Investment portfolio management (funds, ETFs, stocks)
+    - Real-time fund quotes from 东方财富
+    - Budget management
+    - Financial reports (monthly summary, net worth, cash flow)
+
+    All endpoints return `{"success": true, "data": {...}}` on success,
+    `{"success": false, "error": {"message": "..."}}` on failure.
+
+    Default base URL: http://localhost:3001
+  version: 1.0.0
+  contact:
+    name: Hermes Funds
+    url: https://github.com/zndxyhn/hermes-funds
+
+servers:
+  - url: http://localhost:3001
+    description: Development
+  - url: https://your-production-domain.com
+    description: Production
+
+paths:
+  # ─────────────────────────────────────────────
+  # NLU Parsing
+  # ─────────────────────────────────────────────
+  /api/nlu/parse:
+    post:
+      operationId: parseNaturalLanguage
+      summary: Parse natural language to structured financial intent
+      description: |
+        Converts Chinese natural language text into structured data.
+        Example: "餐饮花费128元" → {intent: expense, amount: 128, category: 餐饮}
+      tags: [NLU]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  description: Natural language input (max 500 chars)
+                  example: "餐饮花费128元"
+      responses:
+        "200":
+          description: Parsed result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NluResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────
+  # Transactions
+  # ─────────────────────────────────────────────
+  /api/transactions:
+    get:
+      operationId: listTransactions
+      summary: List transactions
+      tags: [Transactions]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [expense, income, transfer, investment_buy, investment_sell]
+      responses:
+        "200":
+          description: Paginated transaction list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionList"
+    post:
+      operationId: createTransaction
+      summary: Create a transaction
+      tags: [Transactions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionCreate"
+      responses:
+        "200":
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+
+  /api/transactions/{id}:
+    delete:
+      operationId: deleteTransaction
+      summary: Delete a transaction
+      tags: [Transactions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ─────────────────────────────────────────────
+  # Accounts
+  # ─────────────────────────────────────────────
+  /api/accounts:
+    get:
+      operationId: listAccounts
+      summary: List all accounts
+      tags: [Accounts]
+      responses:
+        "200":
+          description: Account list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountList"
+    post:
+      operationId: createAccount
+      summary: Create an account
+      tags: [Accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountCreate"
+      responses:
+        "200":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountResponse"
+
+  # ─────────────────────────────────────────────
+  # Categories
+  # ─────────────────────────────────────────────
+  /api/categories:
+    get:
+      operationId: listCategories
+      summary: List categories
+      tags: [Categories]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [expense, income, investment]
+          description: Filter by type
+      responses:
+        "200":
+          description: Category list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryList"
+
+  # ─────────────────────────────────────────────
+  # Investments
+  # ─────────────────────────────────────────────
+  /api/investments:
+    get:
+      operationId: listInvestments
+      summary: List investment portfolio
+      tags: [Investments]
+      responses:
+        "200":
+          description: Investment list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestmentList"
+    post:
+      operationId: createInvestment
+      summary: Add an investment
+      tags: [Investments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestmentCreate"
+      responses:
+        "200":
+          description: Investment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvestmentResponse"
+
+  /api/investments/search:
+    get:
+      operationId: searchFunds
+      summary: Search funds by name
+      tags: [Investments]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "华夏"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FundSearchResults"
+
+  # ─────────────────────────────────────────────
+  # Fund Quotes
+  # ─────────────────────────────────────────────
+  /api/fund-quotes:
+    get:
+      operationId: getFundQuote
+      summary: Get real-time fund quote
+      description: |
+        Data source: 东方财富（天天基金网）
+        No API key required.
+        Rate limit: ~5 minutes recommended between requests.
+      tags: [Fund Quotes]
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 6-digit fund ticker code
+          example: "000001"
+      responses:
+        "200":
+          description: Fund quote data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FundQuote"
+        "400":
+          description: Quote unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ─────────────────────────────────────────────
+  # Reports
+  # ─────────────────────────────────────────────
+  /api/reports/monthly_summary:
+    get:
+      operationId: getMonthlySummary
+      summary: Monthly expense/income summary
+      tags: [Reports]
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+          example: 2026
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          example: 5
+      responses:
+        "200":
+          description: Monthly report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonthlySummary"
+
+  /api/reports/net-worth:
+    get:
+      operationId: getNetWorth
+      summary: Net worth statement
+      tags: [Reports]
+      responses:
+        "200":
+          description: Net worth data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetWorth"
+
+  /api/reports/cash-flow:
+    get:
+      operationId: getCashFlow
+      summary: Cash flow report
+      tags: [Reports]
+      responses:
+        "200":
+          description: Cash flow data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashFlow"
+
+  # ─────────────────────────────────────────────
+  # Budgets
+  # ─────────────────────────────────────────────
+  /api/budgets:
+    get:
+      operationId: listBudgets
+      summary: List budgets
+      tags: [Budgets]
+      responses:
+        "200":
+          description: Budget list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetList"
+    post:
+      operationId: createBudget
+      summary: Create a budget
+      tags: [Budgets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BudgetCreate"
+      responses:
+        "200":
+          description: Budget created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetResponse"
+
+# ─────────────────────────────────────────────
+# Components
+# ─────────────────────────────────────────────
+components:
+  schemas:
+    # ─── Base ────────────────────────────────
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "错误描述"
+
+    # ─── NLU ────────────────────────────────
+    NluResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            intent:
+              type: string
+              enum: [expense, income, transfer, investment_buy, investment_sell, query_summary, query_budget, query_investment, unknown]
+            intentConfidence:
+              type: number
+            amount:
+              type: number
+              nullable: true
+            date:
+              type: string
+              format: date
+            category:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                confidence:
+                  type: number
+                method:
+                  type: string
+            account:
+              type: string
+              nullable: true
+            canConfirm:
+              type: boolean
+            missingSlots:
+              type: array
+              items:
+                type: string
+
+    # ─── Transaction ────────────────────────
+    TransactionList:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Transaction"
+            total:
+              type: integer
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            totalPages:
+              type: integer
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [expense, income, transfer, investment_buy, investment_sell]
+        amount:
+          type: number
+        description:
+          type: string
+        notes:
+          type: string
+        date:
+          type: integer
+          description: Unix timestamp
+        categoryId:
+          type: string
+        categoryName:
+          type: string
+        accountId:
+          type: string
+        accountName:
+          type: string
+
+    TransactionCreate:
+      type: object
+      required: [type, amount, categoryId, accountId, date]
+      properties:
+        type:
+          type: string
+          enum: [expense, income, transfer, investment_buy, investment_sell]
+        amount:
+          type: number
+        categoryId:
+          type: string
+        accountId:
+          type: string
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        notes:
+          type: string
+
+    TransactionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            balanceAfter:
+              type: number
+
+    # ─── Account ───────────────────────────
+    AccountList:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Account"
+
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [cash, bank, digital, investment, credit, other]
+        balance:
+          type: number
+        currency:
+          type: string
+          example: "CNY"
+        icon:
+          type: string
+
+    AccountCreate:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [cash, bank, digital, investment, credit, other]
+        balance:
+          type: number
+          default: 0
+        currency:
+          type: string
+          default: "CNY"
+        icon:
+          type: string
+
+    AccountResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+
+    # ─── Category ──────────────────────────
+    CategoryList:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              icon:
+                type: string
+              type:
+                type: string
+
+    # ─── Investment ────────────────────────
+    InvestmentList:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Investment"
+
+    Investment:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ticker:
+          type: string
+        type:
+          type: string
+          enum: [fund, stock, etf, gold, bond, mmf, cb, reits, private, other]
+        totalUnits:
+          type: number
+        totalCost:
+          type: number
+        avgCost:
+          type: number
+        currentValue:
+          type: number
+        profit:
+          type: number
+        profitRate:
+          type: number
+
+    InvestmentCreate:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        ticker:
+          type: string
+        type:
+          type: string
+          enum: [fund, stock, etf, gold, bond, mmf, cb, reits, private, other]
+        totalUnits:
+          type: number
+          default: 0
+        totalCost:
+          type: number
+          default: 0
+
+    InvestmentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+
+    FundSearchResults:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              ticker:
+                type: string
+              name:
+                type: string
+              type:
+                type: string
+
+    # ─── Fund Quote ────────────────────────
+    FundQuote:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            ticker:
+              type: string
+            name:
+              type: string
+            nav:
+              type: number
+              description: Unit net value
+            navDate:
+              type: string
+              format: date
+            estNav:
+              type: number
+              description: Estimated NAV (real-time)
+            estNavTime:
+              type: string
+            dayChange:
+              type: number
+              description: Daily change percentage (%)
+
+    # ─── Reports ──────────────────────────
+    MonthlySummary:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            year:
+              type: integer
+            month:
+              type: integer
+            income:
+              type: object
+              properties:
+                total:
+                  type: number
+                count:
+                  type: integer
+            expense:
+              type: object
+              properties:
+                total:
+                  type: number
+                count:
+                  type: integer
+            balance:
+              type: number
+            categoryBreakdown:
+              type: array
+              items:
+                type: object
+            daily:
+              type: array
+              items:
+                type: object
+
+    NetWorth:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            totalAssets:
+              type: number
+            totalLiabilities:
+              type: number
+            netWorth:
+              type: number
+            assets:
+              type: array
+            liabilities:
+              type: array
+
+    CashFlow:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+
+    # ─── Budget ───────────────────────────
+    BudgetList:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+
+    BudgetCreate:
+      type: object
+      required: [amount]
+      properties:
+        categoryId:
+          type: string
+          nullable: true
+        amount:
+          type: number
+        period:
+          type: string
+          enum: [weekly, monthly, yearly]
+          default: monthly
+
+    BudgetResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
