@@ -6,14 +6,7 @@
  * Returns: { success, data: { intent, amount, date, category, canConfirm, missingSlots, confidence } }
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createRequire } from "module";
-import path from "path";
-
-// NLU engine 路径：~/.hermes/profiles/gaoshou/skills/hermes-funds/scripts/nlu_engine.js
-const nluPath = path.resolve(
-  process.env.HOME ?? "/home/admin",
-  ".hermes/profiles/gaoshou/skills/hermes-funds/scripts/nlu_engine.js"
-);
+import { parse } from "@/lib/services/nlu-engine";
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,10 +27,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 动态加载 NLU 引擎（运行时加载，避免 webpack 静态分析）
-    // eslint-disable-next-line @typescript-eslint/require-await
-    const { parse } = await import(/* webpackIgnore: true */ `file://${nluPath}`);
-
     const result = parse(text);
 
     // 规范化返回结构
@@ -47,11 +36,11 @@ export async function POST(req: NextRequest) {
       amount: result.amount ?? null,
       date: result.date ?? null,
       category: result.category ?? null,
-      account: result.account ?? null,
-      investment: result.investment ?? null,
-      canConfirm: result.canConfirm ?? false,
-      missingSlots: result.missingSlots ?? [],
-      response: result.response ?? null,
+      account: result.accountHint ?? null,
+      investment: null,
+      canConfirm: result.canConfirm,
+      missingSlots: result.missingSlots,
+      response: null,
       originalText: text,
     };
 
