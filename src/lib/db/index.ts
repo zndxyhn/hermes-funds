@@ -17,7 +17,10 @@ export function getDb() {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const dbPath = path.join(dataDir, "hermes-funds.db");
+  // 环境隔离：开发用 XXX-dev.db，生产用 XXX-prod.db
+  const env = process.env.NODE_ENV || "development";
+  const dbName = process.env.DB_NAME || (env === "production" ? "hermes-funds-prod.db" : "hermes-funds-dev.db");
+  const dbPath = path.join(dataDir, dbName);
   const sqlite = new Database(dbPath);
 
   // 开发环境启用 WAL 模式
@@ -40,7 +43,9 @@ export function initDatabase() {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const dbPath = path.join(dataDir, "hermes-funds.db");
+  const env = process.env.NODE_ENV || "development";
+  const dbName = process.env.DB_NAME || (env === "production" ? "hermes-funds-prod.db" : "hermes-funds-dev.db");
+  const dbPath = path.join(dataDir, dbName);
   const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
