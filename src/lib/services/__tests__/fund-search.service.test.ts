@@ -57,7 +57,7 @@ beforeAll(() => {
     ["inv_fs_5", "user_fs_test", "贵州茅台", "stock", "600519", 20000, 200],
   ];
 
-  for (const [id, uid, name, type, ticker, value, profit] of funds) {
+  for (const [id, uid, name, type, ticker, value, profit] of funds as [string, string, string, string, string, number, number][]) {
     const rate = (profit / (value - profit)) * 100;
     db.prepare(`
       INSERT INTO investments (id, user_id, name, type, ticker, current_value, profit, profit_rate, created_at, updated_at)
