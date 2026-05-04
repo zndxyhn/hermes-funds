@@ -295,6 +295,7 @@ export type InvestmentTransaction =
 export type NewInvestmentTransaction =
   typeof investmentTransactions.$inferInsert;
 export type FundCache = typeof fundCache.$inferSelect;
+export type NewFundCache = typeof fundCache.$inferInsert;
 export type SipPlan = typeof sipPlans.$inferSelect;
 export type NewSipPlan = typeof sipPlans.$inferInsert;
 export type Budget = typeof budgets.$inferSelect;
